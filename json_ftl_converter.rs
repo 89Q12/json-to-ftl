@@ -8,8 +8,8 @@ fn ftl_parse(input: &str) -> String {
     // Blame invidious' terrible formatting for this monster of a replacer chain!
     let rinput = input.replace("  ", " ")  // Replace any double-spaces with single spaces
                       .trim()              // Trim JSON tabs
-                      .replace(" `x`", "") // Replace strangely-spaced `x` with *nothin!*
-                      .replace("`x`", "")  // Replace `x` with *nothin!*
+                      .replace(" `x`", " VARHERE") // Replace strangely-spaced `x` with *nothin!*
+                      .replace("`x`", "VARHERE")  // Replace `x` with *nothin!*
                       .replace(":", "=")   // Remove escaped quotes for single backlashes
                       .replace("\"", "");  // Replace : syntax with =
 
