@@ -17,7 +17,6 @@ fn get_rebindings() -> HashMap<&'static str, &'static str> {
         ("please_sign_in_using_log_in_with_google",                "sign_in_using_google"),
         ("password_cannot_be_longer_than_55_characters",           "password_too_long"),
         ("token_is_expired_please_try_again",                      "token_expired"),
-        ("%a_%b_%-d,_%y",                                          "WTF"),
         ("family_friendly_",                                       "family_friendly"),
         ("x_uploaded_a_video",                                     "upload_text"),
         ("x_is_live",                                              "live_upload_text"),
