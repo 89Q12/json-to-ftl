@@ -85,7 +85,7 @@ fn ftl_parse(input: &str) -> String {
                     '/' => continue,
                     '\u{005C}' => continue,
                     '.' => continue,
-                    '?' => continue,
+                    '?' => result.push_str("_question"),
                     ',' => continue,
                     '&' => continue,
                     '!' => continue,
