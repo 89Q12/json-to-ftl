@@ -164,7 +164,8 @@ fn main() {
                             mutated_line
                                 + "="
                                 + &value[line]
-                                    .to_string()
+                                    .as_str()
+                                    .unwrap()
                                     .replace("`x`", "{ $x }")
                                     .replace(" `x`", " { $x }")
                                     .replace("{{count}}", "{ $x }"),
