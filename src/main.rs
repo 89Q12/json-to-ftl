@@ -1,5 +1,5 @@
-use std::fs;
 use std::collections::HashMap;
+use std::fs;
 
 use serde_json::Value;
 
@@ -46,14 +46,24 @@ fn generate_ftl_rebindings(input: &Vec<String>) -> HashMap<String, String> {
     let mut keymap = HashMap::<String, String>::new();
     // Loop every line of the FTL file
     for line in input {
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         // Extract the key manually (can't use split, as `=` is also used within values sometimes)
         let mut key: String = String::new();
         for c in line.chars() {
-            if c == '=' { break; }
+            if c == '=' {
+                break;
+            }
             key += &c.to_string();
         }
-        keymap.insert(key.clone(), fluent_rebinds.get(&key.as_str()).unwrap_or(&key.as_str()).to_string());
+        keymap.insert(
+            key.clone(),
+            fluent_rebinds
+                .get(&key.as_str())
+                .unwrap_or(&key.as_str())
+                .to_string(),
+        );
     }
 
     keymap
@@ -65,14 +75,15 @@ fn ftl_parse(input: &str) -> String {
 
     // Global replace a bunch of constant formatting
     // Blame invidious' terrible formatting for this monster of a replacer chain!
-    let rinput = input.replace("  ", " ")  // Replace any double-spaces with single spaces
-                      .trim()              // Trim JSON tabs
-                      .replace(" `x`", "_x") // Replace strangely-spaced `x` with a clear variable designator
-                      .replace("`x`", "x")  // Replace `x` with a clear variable designator
-                      .replace("\":", "")
-                      .replace(" - ", " ")
-                      .replace("/", " ")
-                      .replace("-", "_");
+    let rinput = input
+        .replace("  ", " ") // Replace any double-spaces with single spaces
+        .trim() // Trim JSON tabs
+        .replace(" `x`", "_x") // Replace strangely-spaced `x` with a clear variable designator
+        .replace("`x`", "x") // Replace `x` with a clear variable designator
+        .replace("\":", "")
+        .replace(" - ", " ")
+        .replace("/", " ")
+        .replace("-", "_");
     // Loop every char of the JSON keypair
     for c in rinput.chars() {
         // Keep any non-space char
@@ -97,7 +108,6 @@ fn ftl_parse(input: &str) -> String {
             ' ' => result.push('_'),
             _ => result.push(c.to_lowercase().to_string().chars().next().unwrap()),
         }
-        
     }
 
     // Run a couple post-processing replaces and return!
@@ -122,29 +132,71 @@ fn main() {
                     // Parse each individual line
                     let mut parsed_vec_lines: Vec<String> = Vec::new();
                     for line in value.as_object().unwrap().keys() {
-                        let mut mutated_line =ftl_parse(line);
+                        let mut mutated_line = ftl_parse(line);
                         if fluent_rebinds.contains_key(&mutated_line.as_str()) {
-                            mutated_line = fluent_rebinds.get(&mutated_line.as_str()).unwrap().to_string();
+                            mutated_line = fluent_rebinds
+                                .get(&mutated_line.as_str())
+                                .unwrap()
+                                .to_string();
                         }
                         println!("{}", mutated_line);
-                        println!("{}", value[line].to_string().replace("`x`", "{ $x }").replace(" `x`", " { $x }").replace("{{count}}", "{ $x }"));
-                        if value[line].is_object(){
-                            parsed_vec_lines.push(mutated_line+"="+&value[line].as_object().unwrap()[""].as_str().unwrap().replace("`x`", "{ $x }").replace(" `x`", " { $x }"));
+                        println!(
+                            "{}",
+                            value[line]
+                                .to_string()
+                                .replace("`x`", "{ $x }")
+                                .replace(" `x`", " { $x }")
+                                .replace("{{count}}", "{ $x }")
+                        );
+                        if value[line].is_object() {
+                            parsed_vec_lines.push(
+                                mutated_line
+                                    + "="
+                                    + &value[line].as_object().unwrap()[""]
+                                        .as_str()
+                                        .unwrap()
+                                        .replace("`x`", "{ $x }")
+                                        .replace(" `x`", " { $x }"),
+                            );
                             continue;
                         }
-                        parsed_vec_lines.push(mutated_line+"="+&value[line].to_string().replace("`x`", "{ $x }").replace(" `x`", " { $x }").replace("{{count}}", "{ $x }"));
+                        parsed_vec_lines.push(
+                            mutated_line
+                                + "="
+                                + &value[line]
+                                    .to_string()
+                                    .replace("`x`", "{ $x }")
+                                    .replace(" `x`", " { $x }")
+                                    .replace("{{count}}", "{ $x }"),
+                        );
                     }
                     // Compile into a single string file
                     let parsed_fluent_file = parsed_vec_lines.join("\n");
 
                     // Ensure the relevant directory exists
-                    if fs::read_dir(entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap()).is_err() {
-                        fs::create_dir(entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap()).unwrap();
+                    if fs::read_dir(entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap())
+                        .is_err()
+                    {
+                        fs::create_dir(
+                            entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap(),
+                        )
+                        .unwrap();
                     }
 
                     // Write new version to disk
-                    fs::write(format!("{}/basic.ftl", entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap()), parsed_fluent_file).unwrap();
-                    println!("{}: Parsed {} lines into proper .ftl format!", entry_name, &parsed_vec_lines.len());
+                    fs::write(
+                        format!(
+                            "{}/basic.ftl",
+                            entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap()
+                        ),
+                        parsed_fluent_file,
+                    )
+                    .unwrap();
+                    println!(
+                        "{}: Parsed {} lines into proper .ftl format!",
+                        entry_name,
+                        &parsed_vec_lines.len()
+                    );
                 }
             }
         }
