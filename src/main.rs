@@ -1,8 +1,10 @@
-use std::fs;
 use std::collections::HashMap;
+use std::fs;
+
+use serde_json::Value;
 
 // A designator to specify where a variable belongs in this key/value. (e.g: for a templating engine)
-static VAR_DESIGNATOR: &str = "${x}";
+static VAR_DESIGNATOR: &str = "{ $x }";
 
 // A reusable function to fetch the fluent rebinding hashmap
 fn get_rebindings() -> HashMap<&'static str, &'static str> {
@@ -19,13 +21,20 @@ fn get_rebindings() -> HashMap<&'static str, &'static str> {
         ("token_is_expired_please_try_again",                      "token_expired"),
         ("family_friendly_",                                       "family_friendly"),
         ("x_uploaded_a_video",                                     "upload_text"),
-        ("x_is_live",                                              "live_upload_text"),
+        ("x_is_live",                                              "channel_is_live"),
         ("x_ago",                                                  "upload_date"),
         ("norwegian_bokmål",                                       "norwegian"),
         ("%a_%b_%_d_%y",                                           "WTF"),
-        ("x_marked_it_with_a_",                                    "like"),
+        ("x_marked_it_with_a_",                                    "liked"),
         (r#"[^0_9]|^1[^0_9]|$"#,                                   "view_comments"),
-        (r#"[^0_9]^1[^0_9]"#,                                      "view_comments")
+        (r#"[^0_9]^1[^0_9]"#,                                      "view_comments"),
+        (r#"password_cannot_be_longer_than_55_characters"#,        "password_too_long"),
+        (r#"adminprefs_modified_source_code_url_label"#,           "modified_source_code_url_label"),
+        (r#"edited"#,                                              "comment_edited"),
+        (r#"alternative_youtube_front-end"#,                       "about_project"),
+        (r#"export_subscriptions_as_opml_for_newpipe__freetube"#,  "export_subscriptions_as_opml_for_other_projects"),
+        (r#"hidden_field_"challenge"_is_a_required_field"#,        "challenge_is_required"),
+        (r#"hidden_field_"token"_is_a_required_field"#,            "csrf_token_is_required"),
     ]);
     fluent_rebinds
 }
@@ -37,14 +46,24 @@ fn generate_ftl_rebindings(input: &Vec<String>) -> HashMap<String, String> {
     let mut keymap = HashMap::<String, String>::new();
     // Loop every line of the FTL file
     for line in input {
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         // Extract the key manually (can't use split, as `=` is also used within values sometimes)
         let mut key: String = String::new();
         for c in line.chars() {
-            if c == '=' { break; }
+            if c == '=' {
+                break;
+            }
             key += &c.to_string();
         }
-        keymap.insert(key.clone(), fluent_rebinds.get(&key.as_str()).unwrap_or(&key.as_str()).to_string());
+        keymap.insert(
+            key.clone(),
+            fluent_rebinds
+                .get(&key.as_str())
+                .unwrap_or(&key.as_str())
+                .to_string(),
+        );
     }
 
     keymap
@@ -56,61 +75,43 @@ fn ftl_parse(input: &str) -> String {
 
     // Global replace a bunch of constant formatting
     // Blame invidious' terrible formatting for this monster of a replacer chain!
-    let rinput = input.replace("  ", " ")  // Replace any double-spaces with single spaces
-                      .trim()              // Trim JSON tabs
-                      .replace(" `x`", format!(" {}", VAR_DESIGNATOR).as_str()) // Replace strangely-spaced `x` with a clear variable designator
-                      .replace("`x`", VAR_DESIGNATOR)  // Replace `x` with a clear variable designator
-                      .replace("\":", "=") // Replace : syntax with =
-                      .replace("\"", "");  // Remove escaped quotes for single backlashes
-
-    // Keep track if we're within the Key or Value
-    let mut is_in_value = false;
+    let rinput = input
+        .replace("  ", " ") // Replace any double-spaces with single spaces
+        .trim() // Trim JSON tabs
+        .replace(" `x`", "_x") // Replace strangely-spaced `x` with a clear variable designator
+        .replace("`x`", "x") // Replace `x` with a clear variable designator
+        .replace("\":", "")
+        .replace(" - ", " ")
+        .replace("/", " ")
+        .replace("-", "_");
     // Loop every char of the JSON keypair
     for c in rinput.chars() {
-        if c == ' ' && !is_in_value {
-            // Replace spaces with underscores
-            result.push('_');
-        } else {
-            // Keep any non-space char
-            // If we're still within the key: convert to lowercase too
-            if is_in_value {
-                match c {
-                    '=' => result.push(':'), // Due to replace(":", "=") we need to now replace = with : again.
-                    _ => result.push(c),
-                }
-            } else {
-                match c {
-                    '(' => continue,
-                    ')' => continue,
-                    '/' => continue,
-                    '\u{005C}' => continue,
-                    '.' => continue,
-                    '?' => result.push_str("_question"),
-                    ',' => continue,
-                    '&' => continue,
-                    '!' => continue,
-                    '$' => continue,
-                    '{' => continue,
-                    '}' => continue,
-                    '|' => continue,
-                    '\u{2764}' => continue,
-                    '\u{0027}' => continue,
-                    '-' => result.push('_'),
-                    _ => result.push(c.to_lowercase().to_string().chars().next().unwrap()),
-                }
-            }
-        }
-
-        // Cancel any replaces after the equals sign
-        if c == '=' {
-            is_in_value = true;
+        // Keep any non-space char
+        match c {
+            '(' => continue,
+            ')' => continue,
+            '/' => continue,
+            '\u{005C}' => continue,
+            '.' => continue,
+            '?' => result.push_str("_question"),
+            ',' => continue,
+            '&' => continue,
+            '!' => continue,
+            '$' => continue,
+            '{' => continue,
+            '}' => continue,
+            '|' => continue,
+            ':' => continue,
+            '\u{2764}' => continue,
+            '\u{0027}' => continue,
+            '-' => result.push('_'),
+            ' ' => result.push('_'),
+            _ => result.push(c.to_lowercase().to_string().chars().next().unwrap()),
         }
     }
 
     // Run a couple post-processing replaces and return!
-    result.replace(":_", "")   // Trim unnecessary key endings
-          .replace(".=", "=")  // Trim unnecessary periods
-          .replace("_-_", "_") // Replace _-_ with a single underscore
+    result
 }
 
 fn main() {
@@ -120,43 +121,82 @@ fn main() {
             if let Ok(entry) = entry {
                 let entry_name = entry.file_name().into_string().unwrap();
                 if entry_name.ends_with(".json") {
+                    let fluent_rebinds = get_rebindings();
                     // Read JSON translations
                     let file = &fs::read(&entry_name).expect("This should never happen! Whoops.");
                     let input: &str = &String::from_utf8_lossy(file);
 
                     // Split into lines
-                    let vec_lines = input.split("\n");
+                    let value: Value = serde_json::from_str(input).unwrap();
 
                     // Parse each individual line
                     let mut parsed_vec_lines: Vec<String> = Vec::new();
-                    for line in vec_lines {
-                        // Ignore lines with open/close brackets
-                        if line.contains("{") || line.contains("}") { continue };
-                        // Parse'n'check'n'push!
-                        let parsed_line = ftl_parse(line);
-                        // No empty/malformed lines!
-                        if parsed_line.starts_with("=") || parsed_line.is_empty() { continue };
-                        parsed_vec_lines.push(parsed_line);
+                    for line in value.as_object().unwrap().keys() {
+                        let mut mutated_line = ftl_parse(line);
+                        if fluent_rebinds.contains_key(&mutated_line.as_str()) {
+                            mutated_line = fluent_rebinds
+                                .get(&mutated_line.as_str())
+                                .unwrap()
+                                .to_string();
+                        }
+                        println!("{}", mutated_line);
+                        println!(
+                            "{}",
+                            value[line]
+                                .to_string()
+                                .replace("`x`", "{ $x }")
+                                .replace(" `x`", " { $x }")
+                                .replace("{{count}}", "{ $x }")
+                        );
+                        if value[line].is_object() {
+                            parsed_vec_lines.push(
+                                mutated_line
+                                    + "="
+                                    + &value[line].as_object().unwrap()[""]
+                                        .as_str()
+                                        .unwrap()
+                                        .replace("`x`", "{ $x }")
+                                        .replace(" `x`", " { $x }"),
+                            );
+                            continue;
+                        }
+                        parsed_vec_lines.push(
+                            mutated_line
+                                + "="
+                                + &value[line]
+                                    .to_string()
+                                    .replace("`x`", "{ $x }")
+                                    .replace(" `x`", " { $x }")
+                                    .replace("{{count}}", "{ $x }"),
+                        );
                     }
-
                     // Compile into a single string file
-                    let mut parsed_fluent_file = parsed_vec_lines.join("\n");
+                    let parsed_fluent_file = parsed_vec_lines.join("\n");
 
-                    // Generate rebindings from parsed lines
-                    let rebindings = generate_ftl_rebindings(&parsed_vec_lines);
-                    for old_key in rebindings.keys() {
-                        // Apply to the final string file
-                        parsed_fluent_file = parsed_fluent_file.replace(old_key, rebindings.get(old_key).unwrap_or(old_key));
-                    }
-
-                    // Ensure the relevent directory exists
-                    if fs::read_dir(entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap()).is_err() {
-                        fs::create_dir(entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap()).unwrap();
+                    // Ensure the relevant directory exists
+                    if fs::read_dir(entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap())
+                        .is_err()
+                    {
+                        fs::create_dir(
+                            entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap(),
+                        )
+                        .unwrap();
                     }
 
                     // Write new version to disk
-                    fs::write(format!("{}/basic.ftl", entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap()), parsed_fluent_file).unwrap();
-                    println!("{}: Parsed {} lines into proper .ftl format!", entry_name, &parsed_vec_lines.len());
+                    fs::write(
+                        format!(
+                            "{}/basic.ftl",
+                            entry_name.split(".").collect::<Vec<&str>>().get(0).unwrap()
+                        ),
+                        parsed_fluent_file,
+                    )
+                    .unwrap();
+                    println!(
+                        "{}: Parsed {} lines into proper .ftl format!",
+                        entry_name,
+                        &parsed_vec_lines.len()
+                    );
                 }
             }
         }
