@@ -3,9 +3,6 @@ use std::fs;
 
 use serde_json::Value;
 
-// A designator to specify where a variable belongs in this key/value. (e.g: for a templating engine)
-static VAR_DESIGNATOR: &str = "{ $x }";
-
 // A reusable function to fetch the fluent rebinding hashmap
 fn get_rebindings() -> HashMap<&'static str, &'static str> {
     let fluent_rebinds: HashMap<&'static str, &'static str> = HashMap::from([
@@ -37,36 +34,6 @@ fn get_rebindings() -> HashMap<&'static str, &'static str> {
         (r#"hidden_field_"token"_is_a_required_field"#,            "csrf_token_is_required"),
     ]);
     fluent_rebinds
-}
-
-// Safely rebind all fluent keys into a more 'sane' format via HashMap, if no rebind is available: the old key is used.
-fn generate_ftl_rebindings(input: &Vec<String>) -> HashMap<String, String> {
-    // Fetch rebindings and prep the string map
-    let fluent_rebinds = get_rebindings();
-    let mut keymap = HashMap::<String, String>::new();
-    // Loop every line of the FTL file
-    for line in input {
-        if line.is_empty() {
-            continue;
-        }
-        // Extract the key manually (can't use split, as `=` is also used within values sometimes)
-        let mut key: String = String::new();
-        for c in line.chars() {
-            if c == '=' {
-                break;
-            }
-            key += &c.to_string();
-        }
-        keymap.insert(
-            key.clone(),
-            fluent_rebinds
-                .get(&key.as_str())
-                .unwrap_or(&key.as_str())
-                .to_string(),
-        );
-    }
-
-    keymap
 }
 
 // Parse a JSON invidious lang file into FTL format
