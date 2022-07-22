@@ -32,7 +32,9 @@ fn get_rebindings() -> HashMap<&'static str, &'static str> {
         (r#"adminprefs_modified_source_code_url_label"#,           "modified_source_code_url_label"),
         (r#"edited"#,                                              "comment_edited"),
         (r#"alternative_youtube_front-end"#,                       "about_project"),
-        (r#"export_subscriptions_as_opml_for_newpipe__freetube"#, "export_subscriptions_as_opml_for_other_projects"),
+        (r#"export_subscriptions_as_opml_for_newpipe__freetube"#,  "export_subscriptions_as_opml_for_other_projects"),
+        (r#"hidden_field_"challenge"_is_a_required_field"#,        "challenge_is_required"),
+        (r#"hidden_field_"token"_is_a_required_field"#,            "csrf_token_is_required"),
     ]);
     fluent_rebinds
 }
@@ -120,13 +122,17 @@ fn main() {
                     // Parse each individual line
                     let mut parsed_vec_lines: Vec<String> = Vec::new();
                     for line in value.as_object().unwrap().keys() {
-                        println!("{}", line);
                         let mut mutated_line =ftl_parse(line);
                         if fluent_rebinds.contains_key(&mutated_line.as_str()) {
                             mutated_line = fluent_rebinds.get(&mutated_line.as_str()).unwrap().to_string();
                         }
                         println!("{}", mutated_line);
-                        //parsed_vec_lines.push(ftl_parse(line)+"="+ value[line].as_str().unwrap());
+                        println!("{}", value[line].to_string().replace("`x`", "{ $x }").replace(" `x`", " { $x }").replace("{{count}}", "{ $x }"));
+                        if value[line].is_object(){
+                            parsed_vec_lines.push(mutated_line+"="+&value[line].as_object().unwrap()[""].as_str().unwrap().replace("`x`", "{ $x }").replace(" `x`", " { $x }"));
+                            continue;
+                        }
+                        parsed_vec_lines.push(mutated_line+"="+&value[line].to_string().replace("`x`", "{ $x }").replace(" `x`", " { $x }").replace("{{count}}", "{ $x }"));
                     }
                     // Compile into a single string file
                     let parsed_fluent_file = parsed_vec_lines.join("\n");
