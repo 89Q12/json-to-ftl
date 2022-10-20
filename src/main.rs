@@ -82,6 +82,7 @@ fn ftl_parse(input: &str) -> String {
 }
 
 fn main() {
+    let mut total_lines: i32 = 0;
     // Loop all files in the current directory, parsing only '.json' files
     if let Ok(entries) = fs::read_dir(".") {
         for entry in entries {
@@ -92,13 +93,16 @@ fn main() {
                     // Read JSON translations
                     let file = &fs::read(&entry_name).expect("This should never happen! Whoops.");
                     let input: &str = &String::from_utf8_lossy(file);
-
+                    let mut keys = HashMap::<String,u8>::new();
                     // Split into lines
                     let value: Value = serde_json::from_str(input).unwrap();
-
                     // Parse each individual line
                     let mut parsed_vec_lines: Vec<String> = Vec::new();
                     for line in value.as_object().unwrap().keys() {
+                        if keys.contains_key(line){
+                            continue;
+                        }
+                        keys.insert(line.to_string(), 1);
                         let mut mutated_line = ftl_parse(line);
                         if fluent_rebinds.contains_key(&mutated_line.as_str()) {
                             mutated_line = fluent_rebinds
@@ -163,10 +167,14 @@ fn main() {
                     println!(
                         "{}: Parsed {} lines into proper .ftl format!",
                         entry_name,
-                        &parsed_vec_lines.len()
+                        &parsed_vec_lines.len() -1
                     );
+                    total_lines += (parsed_vec_lines.len() -1) as i32;
                 }
             }
         }
     }
+    println!(
+        "Parsed a total {} lines into proper .ftl format!", total_lines
+    );
 }
